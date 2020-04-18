@@ -7,20 +7,12 @@ CloudFlare Software Engineering Application
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-<<<<<<< HEAD
 #include <string.h>
 #include <sys/socket.h>
 #include <netdb.h>
-=======
-#include <netdb.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
->>>>>>> 4507c8dd2ddd3ea219831d5902acb0847409ad22
 
 #define BUF_SIZE 500
 
-<<<<<<< HEAD
 int
 main(int argc, char *argv[])
 {
@@ -56,24 +48,6 @@ main(int argc, char *argv[])
        Try each address until we successfully bind(2).
        If socket(2) (or bind(2)) fails, we (close the socket
        and) try the next address. */
-=======
-  struct hostent *host_name;
-  char *IP;
-
-  if(argc < 2){
-    perror("Incorrect number of arguments\nUsage: ./ping [hostname or IP]");
-    exit(1);
-  }
-  if((host_name = gethostbyname(argv[1])) != NULL){
-    printf("Hostname is %s\n",host_name->h_name);
-  }
-  else{
-    printf("Could not resolve hostname");
-  }
-
-  IP = inet_ntoa(*((struct in_addr*)host_name->h_addr_list[0]));
-  printf("Host IP is: %s\n", IP);
->>>>>>> 4507c8dd2ddd3ea219831d5902acb0847409ad22
 
     for (rp = result; rp != NULL; rp = rp->ai_next) {
         sfd = socket(rp->ai_family, rp->ai_socktype,
