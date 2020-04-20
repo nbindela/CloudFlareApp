@@ -100,12 +100,13 @@ int main (int argc, char* argv[]){
     printf("Could not resolve host\n");
     exit(1);
   }
+  sin.sin_port = htons(12345);
 	// verify usage
  
   
   // create socket
   
-  sd = socket(AF_UNSPEC, SOCK_RAW, IPPROTO_ICMP);
+  sd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
   if (sd < 0) {
     perror("PING: socket creation failed");
     exit(-1);
