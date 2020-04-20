@@ -26,7 +26,7 @@
 
 #define PING_PKT_S 64
 #define PORT_NO 0
-#define PING_SLEEP_RATE 1000000 
+#define PING_SLEEP_RATE 1000000
 #define RECV_TIMEOUT 1
 
 
@@ -70,6 +70,21 @@ int lookuphost(const char *host, char *ip_str){
   }
   return 1;
 }
+
+unsigned short checksum(void *b, int len)
+{    unsigned short *buf = b;
+    unsigned int sum=0;
+    unsigned short result;
+
+    for ( sum = 0; len > 1; len -= 2 )
+        sum += *buf++;
+    if ( len == 1 )
+        sum += *(unsigned char*)buf;
+    sum = (sum >> 16) + (sum & 0xFFFF);
+    sum += (sum >> 16);
+    result = ~sum;
+    return result;
+} 
 
 void interruptHandler(int i){
   loop = 0;
@@ -126,7 +141,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr,
 
         pckt.msg[i] = 0;
         pckt.hdr.un.echo.sequence = msg_count++;
-        //pckt.hdr.checksum = checksum(&pckt, sizeof(pckt));
+        pckt.hdr.checksum = checksum(&pckt, sizeof(pckt));
 
 
         usleep(PING_SLEEP_RATE);
