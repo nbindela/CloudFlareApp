@@ -289,6 +289,7 @@ int main (int argc, char* argv[]){
   // assign IP/port number to socket where connections come in
   signal(SIGINT,interruptHandler);
 
+  //Begin Ping Sequence
   send_ping(sd, &sin,ip_str,argv[1]);
 
 
