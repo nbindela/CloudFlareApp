@@ -24,39 +24,50 @@
 #define TRUE 1
 #define FALSE 0
 
-#define PING_PKT_S 64
+//Packet Size
+#define PACKET_S 64
+
+//Default Port
 #define PORT_NO 0
+
+//How long to sleep after finishing a ping request
 #define PING_SLEEP_RATE 1000000
+
+//Program will timeout after not recieving packets after this delay(in seconds)
 #define RECV_TIMEOUT 1
 
 
 // Define the Ping Loop
 int loop=1;
 
-struct ping_pkt
+//Struct to hold packets recieved
+struct packet
 {
   struct icmphdr hdr;
-  char msg[PING_PKT_S-sizeof(struct icmphdr)];
+  char msg[PACKET_S-sizeof(struct icmphdr)];
 };
 
+
+//Fucntion for doing a reverse DNS lookup
 int lookuphost(const char *host, char *ip_str){
   struct addrinfo hints, *res;
   int err;
   void *ptr;
 
   memset(&hints,0,sizeof(hints));
-  hints.ai_family = AF_UNSPEC;
+  hints.ai_family = AF_UNSPEC; //Set family for IPv4 or IPv6
 
-  err = getaddrinfo(host,NULL,&hints,&res);
+  err = getaddrinfo(host,NULL,&hints,&res); //Put address info into addrinfo struct res
   if(err != 0){
+    //Failed to get ip from domain name
     perror("getaddrinfo returned an error");
     return -1;
   }
 
-  while(res != NULL){
-    inet_ntop(res->ai_family, res->ai_addr->sa_data,ip_str,100);
+  if(res != NULL){
+    inet_ntop(res->ai_family, res->ai_addr->sa_data,ip_str,100);  //Store the resulting address in the location that the ip_str points to
 
-    switch(res->ai_family){
+    switch(res->ai_family){ //Switch case for IPv4 and IPv6
     case AF_INET:
       ptr = &((struct sockaddr_in *)res->ai_addr)->sin_addr;
       break;
@@ -71,31 +82,40 @@ int lookuphost(const char *host, char *ip_str){
   return 1;
 }
 
-unsigned short checksum(void *b, int len)
-{    unsigned short *buf = b;
+unsigned short csum(void *data, unsigned int size){
+    unsigned short *temp = (unsigned short *) data;
     unsigned int sum=0;
     unsigned short result;
 
-    for ( sum = 0; len > 1; len -= 2 )
-        sum += *buf++;
-    if ( len == 1 )
-        sum += *(unsigned char*)buf;
-    sum = (sum >> 16) + (sum & 0xFFFF);
+    while(size > 1){
+      sum += *temp++;
+      if(sum >> 16){ //If the sum went overflows
+        sum = (sum >> 16) + (sum & 0xFFFF); //Add the overflow
+      }
+      size -= 2; //2 bytes
+
+    }
+    if(size == 1){ //If odd number of bytes add last byte
+      sum += *(unsigned char *)temp;
+    }
+
+    sum = (sum >> 16) + (sum & 0xFFFF); //Add overflow
     sum += (sum >> 16);
     result = ~sum;
     return result;
-} 
+}
 
 void interruptHandler(int i){
+  //Used to end loop when interrupted
   loop = 0;
 }
 
-void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr,
+void send_ping(int ping_sd, struct sockaddr_in *ping_addr,
                 char *ping_ip, char *rev_host)
 {
     int ttl_val=64, msg_count=0, i, addr_len, flag=1,msg_received_count=0;
 
-    struct ping_pkt pckt;
+    struct packet pckt;
     struct sockaddr_in r_addr;
     struct timespec time_start, time_end, tfs, tfe;
     long double rtt_msec=0, total_msec=0;
@@ -106,30 +126,22 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr,
     clock_gettime(CLOCK_MONOTONIC, &tfs);
 
 
-    // set socket options at ip to TTL and value to 64,
-    // change to what you want by setting ttl_val
-    if (setsockopt(ping_sockfd, SOL_IP, IP_TTL,
-               &ttl_val, sizeof(ttl_val)) != 0)
+    // set socket options for TTL
+    if (setsockopt(ping_sd, SOL_IP, IP_TTL, &ttl_val, sizeof(ttl_val)) != 0)
     {
-        printf("\nSetting socket options to TTL failed!\n");
+        printf("\nSetting socket options error\n");
         return;
     }
 
-    else
-    {
-        printf("\nSocket set to TTL..\n");
-    }
+    // setting timeout setting for socket
+    setsockopt(ping_sd, SOL_SOCKET, SO_RCVTIMEO,(const char*)&tv_out, sizeof tv_out);
 
-    // setting timeout of recv setting
-    setsockopt(ping_sockfd, SOL_SOCKET, SO_RCVTIMEO,(const char*)&tv_out, sizeof tv_out);
-
-    // send icmp packet in an infinite loop
-    while(loop)
+    while(loop) //Loop for recieving packets
     {
-        // flag is whether packet was sent or not
+        // flag is if packet was actually sent
         flag=1;
 
-        //filling packet
+        //get data for packet
         bzero(&pckt, sizeof(pckt));
 
         pckt.hdr.type = ICMP_ECHO;
@@ -141,14 +153,14 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr,
 
         pckt.msg[i] = 0;
         pckt.hdr.un.echo.sequence = msg_count++;
-        pckt.hdr.checksum = checksum(&pckt, sizeof(pckt));
+        pckt.hdr.checksum = csum(&pckt, sizeof(pckt)); //Calculate and store Check Sum on data
 
 
         usleep(PING_SLEEP_RATE);
 
         //send packet
         clock_gettime(CLOCK_MONOTONIC, &time_start);
-        if ( sendto(ping_sockfd, &pckt, sizeof(pckt), 0,
+        if ( sendto(ping_sd, &pckt, sizeof(pckt), 0,
            (struct sockaddr*) ping_addr,
             sizeof(*ping_addr)) <= 0)
         {
@@ -159,7 +171,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr,
         //receive packet
         addr_len=sizeof(r_addr);
 
-        if ( recvfrom(ping_sockfd, &pckt, sizeof(pckt), 0,
+        if ( recvfrom(ping_sd, &pckt, sizeof(pckt), 0,
              (struct sockaddr*)&r_addr, &addr_len) <= 0
               && msg_count>1)
         {
@@ -182,7 +194,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr,
                 }
                 else
                 {
-                    printf("%d bytes from (%s) (%s) msg_seq=%d ttl=%d rtt = %Lf ms.\n", PING_PKT_S, rev_host, ping_ip, msg_count, ttl_val, rtt_msec);
+                    printf("%d bytes from (%s) (%s) msg_seq=%d ttl=%d rtt = %Lf ms.\n", packet_S, rev_host, ping_ip, msg_count, ttl_val, rtt_msec);
 
                     msg_received_count++;
                 }
