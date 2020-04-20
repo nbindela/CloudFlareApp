@@ -6,6 +6,9 @@
  *
  * Usage: sudo ./ping [hostname or IPv4 address]
  * sudo must be used when operating with RAW sockets
+ *
+ * Note that this was compiled and run on a UNIX system and may
+ * not work if run on Mac OSX
  */
 
 #include <sys/types.h>
