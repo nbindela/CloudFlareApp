@@ -1,6 +1,11 @@
 /*
  * Nicholas Bindela
  * CloudFlare Application
+ *
+ * Application to emulate the ping Unix command
+ *
+ * Usage: sudo ./ping [hostname or IPv4 address]
+ * sudo must be used when operating with RAW sockets
  */
 
 #include <sys/types.h>
@@ -48,12 +53,16 @@ struct packet
 };
 
 
-//Fucntion for doing a reverse DNS lookup
+/**
+ *Fucntion for doing a reverse DNS lookup
+ *Returns 0,-1 based on whether the function executed correctly
+ */
 int lookuphost(const char *host, char *ip_str){
   struct addrinfo hints, *res;
   int err;
   void *ptr;
 
+  //Allocate memory for the address hints parameter
   memset(&hints,0,sizeof(hints));
   hints.ai_family = AF_UNSPEC; //Set family for IPv4 or IPv6
 
@@ -81,7 +90,10 @@ int lookuphost(const char *host, char *ip_str){
   }
   return 1;
 }
-
+/**
+ * Function to preform a checksum on the incoming data
+ * Returns the value of the checksum as an unsigned int
+ */
 unsigned short csum(void *data, unsigned int size){
     unsigned short *temp = (unsigned short *) data;
     unsigned int sum=0;
@@ -105,11 +117,21 @@ unsigned short csum(void *data, unsigned int size){
     return result;
 }
 
+/**
+ *Function for handling interrupts
+ */
 void interruptHandler(int i){
   //Used to end loop when interrupted
   loop = 0;
 }
 
+/**
+ *Function for handling pings and the ping loop
+ *Params: ping_sd is a socket file descriptor to be used for pinging
+ *ping_addr is a sockaddr_in struct that holds properties of the socket
+ *ping_ip is a string that points to the ip being pinged
+ *rev_host is the argument passed to the commandline that acts as out 'real value' of the host
+ */
 void send_ping(int ping_sd, struct sockaddr_in *ping_addr,
                 char *ping_ip, char *rev_host)
 {
@@ -230,9 +252,6 @@ int main (int argc, char* argv[]){
     exit(-1);
   }
 
-  // The memset call is ESSENTIAL!
-  // if you don't do this every time you create a sockaddr struct, you will
-  // see some pretty strange behaviour
 
 
   //Try to get address
