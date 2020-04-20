@@ -216,7 +216,7 @@ void send_ping(int ping_sd, struct sockaddr_in *ping_addr,
                 }
                 else
                 {
-                    printf("%d bytes from (%s) (%s) msg_seq=%d ttl=%d rtt = %Lf ms.\n", packet_S, rev_host, ping_ip, msg_count, ttl_val, rtt_msec);
+                    printf("%d bytes from (%s) (%s) msg_seq=%d ttl=%d rtt = %Lf ms.\n", PACKET_S, rev_host, ping_ip, msg_count, ttl_val, rtt_msec);
 
                     msg_received_count++;
                 }
