@@ -13,6 +13,9 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <time.h>
+#include <signal.h>
+#include <netinet/ip_icmp.h>
 
 #define BUFFER_SIZE 512 // length of message buffer
 #define	QLEN 6   // length of request queue
@@ -21,9 +24,20 @@
 #define TRUE 1
 #define FALSE 0
 
+#define PING_PKT_S 64
+#define PORT_NO 0
+#define PING_SLEEP_RATE 1000000 
+#define RECV_TIMEOUT 1
+
 
 // Define the Ping Loop
 int loop=1;
+
+struct ping_pkt
+{
+  struct icmphdr hdr;
+  char msg[PING_PKT_S-sizeof(struct icmphdr)];
+};
 
 int lookuphost(const char *host, char *ip_str){
   struct addrinfo hints, *res;
@@ -64,8 +78,7 @@ void interruptHandler(int i){
 void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr,
                 char *ping_ip, char *rev_host)
 {
-    int ttl_val=64, msg_count=0, i, addr_len, flag=1,
-               msg_received_count=0;
+    int ttl_val=64, msg_count=0, i, addr_len, flag=1,msg_received_count=0;
 
     struct ping_pkt pckt;
     struct sockaddr_in r_addr;
@@ -83,8 +96,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr,
     if (setsockopt(ping_sockfd, SOL_IP, IP_TTL,
                &ttl_val, sizeof(ttl_val)) != 0)
     {
-        printf("\nSetting socket options
-                 to TTL failed!\n");
+        printf("\nSetting socket options to TTL failed!\n");
         return;
     }
 
@@ -94,8 +106,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr,
     }
 
     // setting timeout of recv setting
-    setsockopt(ping_sockfd, SOL_SOCKET, SO_RCVTIMEO,
-                   (const char*)&tv_out, sizeof tv_out);
+    setsockopt(ping_sockfd, SOL_SOCKET, SO_RCVTIMEO,(const char*)&tv_out, sizeof tv_out);
 
     // send icmp packet in an infinite loop
     while(loop)
@@ -109,12 +120,13 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr,
         pckt.hdr.type = ICMP_ECHO;
         pckt.hdr.un.echo.id = getpid();
 
-        for ( i = 0; i < sizeof(pckt.msg)-1; i++ )
+        for ( i = 0; i < sizeof(pckt.msg)-1; i++ ){
             pckt.msg[i] = i+'0';
+	}
 
         pckt.msg[i] = 0;
         pckt.hdr.un.echo.sequence = msg_count++;
-        pckt.hdr.checksum = checksum(&pckt, sizeof(pckt));
+        //pckt.hdr.checksum = checksum(&pckt, sizeof(pckt));
 
 
         usleep(PING_SLEEP_RATE);
@@ -143,29 +155,19 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr,
         {
             clock_gettime(CLOCK_MONOTONIC, &time_end);
 
-            double timeElapsed = ((double)(time_end.tv_nsec -
-                                 time_start.tv_nsec))/1000000.0
-            rtt_msec = (time_end.tv_sec-
-                          time_start.tv_sec) * 1000.0
-                        + timeElapsed;
+            double timeElapsed = ((double)(time_end.tv_nsec - time_start.tv_nsec))/1000000.0;
+            rtt_msec = (time_end.tv_sec- time_start.tv_sec) * 1000.0 + timeElapsed;
 
             // if packet was not sent, don't receive
             if(flag)
             {
                 if(!(pckt.hdr.type ==69 && pckt.hdr.code==0))
                 {
-                    printf("Error..Packet received with ICMP
-                           type %d code %d\n",
-                           pckt.hdr.type, pckt.hdr.code);
+                    printf("Error..Packet received with ICMP type %d code %d\n", pckt.hdr.type, pckt.hdr.code);
                 }
                 else
                 {
-                    printf("%d bytes from (%s)
-                          (%s) msg_seq=%d ttl=%d
-                          rtt = %Lf ms.\n",
-                          PING_PKT_S, rev_host,
-                          ping_ip, msg_count,
-                          ttl_val, rtt_msec);
+                    printf("%d bytes from (%s) (%s) msg_seq=%d ttl=%d rtt = %Lf ms.\n", PING_PKT_S, rev_host, ping_ip, msg_count, ttl_val, rtt_msec);
 
                     msg_received_count++;
                 }
@@ -173,18 +175,12 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr,
         }
     }
     clock_gettime(CLOCK_MONOTONIC, &tfe);
-    double timeElapsed = ((double)(tfe.tv_nsec -
-                          tfs.tv_nsec))/1000000.0;
+    double timeElapsed = ((double)(tfe.tv_nsec - tfs.tv_nsec))/1000000.0;
 
-    total_msec = (tfe.tv_sec-tfs.tv_sec)*1000.0+
-                          timeElapsed
+    total_msec = (tfe.tv_sec-tfs.tv_sec)*1000.0+timeElapsed;
 
     printf("\n===%s ping statistics===\n", ping_ip);
-    printf("\n%d packets sent, %d packets received, %f percent
-           packet loss. Total time: %Lf ms.\n\n",
-           msg_count, msg_received_count,
-           ((msg_count - msg_received_count)/msg_count) * 100.0,
-          total_msec);
+    printf("\n%d packets sent, %d packets received, %f percent packet loss. Total time: %Lf ms.\n\n", msg_count, msg_received_count, ((msg_count - msg_received_count)/msg_count) * 100.0, total_msec);
 }
 
 int main (int argc, char* argv[]){
