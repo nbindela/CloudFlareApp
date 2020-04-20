@@ -160,10 +160,10 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr,
                 }
                 else
                 {
-                    printf("%d bytes from %s (h: %s)
+                    printf("%d bytes from (%s)
                           (%s) msg_seq=%d ttl=%d
                           rtt = %Lf ms.\n",
-                          PING_PKT_S, ping_dom, rev_host,
+                          PING_PKT_S, rev_host,
                           ping_ip, msg_count,
                           ttl_val, rtt_msec);
 
